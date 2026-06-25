@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>都江堰市青城山镇，流域水文监控预警平台</title>
+<style>
+/* ============================================================
+   RESET & ROOT
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg1:#0a0e1a;--bg2:#0d1326;--bg3:#0a0f1f;
+  --panel-bg:rgba(8,20,50,0.65);
+  --panel-border:rgba(0,160,255,0.16);
+  --accent-cyan:#00b8ff;--accent-green:#00e676;--accent-red:#ff3d50;
+  --accent-orange:#ff9100;--accent-purple:#7c4dff;
+  --text-primary:#d0e4ff;--text-secondary:#6a8db8;
+  --gap:clamp(6px,0.9vh,12px);--radius:8px;
+  --fs-title:clamp(28px,3.8vh,44px);
+  --fs-sub:clamp(12px,1.4vh,16px);
+  --fs-stat-num:clamp(28px,4vh,48px);
+  --fs-stat-label:clamp(13px,1.6vh,18px);
+  --fs-panel-title:clamp(16px,2vh,22px);
+  --fs-device:clamp(15px,1.8vh,22px);
+  --fs-alert:clamp(14px,1.7vh,20px);
+}
+html,body{width:100vw;height:100vh;overflow:hidden;margin:0;padding:0}
+body{
+  font-family:"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif;
+  background:linear-gradient(170deg,var(--bg1) 0%,var(--bg2) 40%,var(--bg3) 100%);
+  color:var(--text-primary);
+  display:grid;
+  grid-template-rows:auto 1fr;
+  grid-template-columns:23fr 44fr 23fr;
+  gap:var(--gap);
+  padding:var(--gap);
+  user-select:none;
+}
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+.scrollbar::-webkit-scrollbar{width:4px}
+.scrollbar::-webkit-scrollbar-track{background:transparent}
+.scrollbar::-webkit-scrollbar-thumb{background:rgba(0,150,255,.14);border-radius:2px}
+.scrollbar::-webkit-scrollbar-thumb:hover{background:rgba(0,170,255,.28)}
+
+/* ============================================================
+   TITLE BAR (row 1, spans all 3 columns)
+   ============================================================ */
+.title-bar{
+  grid-column:1 / -1;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:clamp(6px,0.9vh,12px) 0 clamp(4px,0.5vh,6px) 0;
+  position:relative;overflow:hidden;
+  border:1px solid rgba(0,120,200,0.12);border-radius:var(--radius);
+  background:linear-gradient(180deg,rgba(6,18,42,0.7),rgba(4,10,28,0.5));
+  min-height:0;
+}
+.title-bar::after{
+  content:'';position:absolute;bottom:0;left:3%;width:94%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,180,255,0.25),transparent);
+}
+.title-bar h1{
+  font-size:var(--fs-title);font-weight:800;letter-spacing:clamp(5px,0.8vw,10px);
+  background:linear-gradient(180deg,#f0e6b8 20%,#5db8fe 60%,#0068d6 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  white-space:nowrap;line-height:1.2;
+}
+.title-bar h2{
+  font-size:var(--fs-sub);font-weight:400;
+  color:rgba(160,200,240,0.55);letter-spacing:clamp(2px,0.5vw,5px);
+  white-space:nowrap;margin-top:1px;
+}
+.title-right{
+  position:absolute;right:clamp(18px,2.2vw,36px);top:50%;transform:translateY(-50%);
+  display:flex;align-items:center;gap:clamp(12px,1.5vw,24px);
+  font-size:var(--fs-sub);color:var(--text-secondary);z-index:1;
+}
+.title-right .dot{width:7px;height:7px;border-radius:50%;background:var(--accent-green);
+  box-shadow:0 0 8px var(--accent-green);animation:pulse-dot 2.2s infinite}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(1.7)}}
+
+/* ============================================================
+   PANEL (shared)
+   ============================================================ */
+.panel{
+  background:var(--panel-bg);
+  border:1px solid var(--panel-border);
+  border-radius:var(--radius);
+  padding:clamp(6px,0.9vh,12px);
+  position:relative;overflow:hidden;
+  display:flex;flex-direction:column;
+  min-height:0;
+}
+.panel::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,160,255,0.18),transparent);
+}
+.panel-title{
+  font-size:var(--fs-panel-title);font-weight:700;color:#5db8fe;
+  margin-bottom:clamp(5px,0.6vh,9px);
+  padding-left:clamp(14px,1.8vw,20px);
+  position:relative;display:flex;align-items:center;
+  gap:clamp(6px,0.8vw,12px);flex-shrink:0;
+}
+.panel-title::before{
+  content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:3px;height:clamp(16px,2vh,22px);
+  background:linear-gradient(180deg,#00d4ff,#0066ff);border-radius:2px;
+}
+.panel-title .badge{
+  font-size:clamp(12px,1.4vh,16px);background:rgba(255,61,80,.15);color:#ff8a80;
+  padding:1px 7px;border-radius:10px;font-weight:600;
+  animation:badge-pulse 2s infinite;
+}
+@keyframes badge-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+
+/* ============================================================
+   LEFT COLUMN
+   ============================================================ */
+.left-col{
+  display:grid;grid-template-rows:auto 1fr;gap:var(--gap);min-height:0;
+}
+/* Stat cards: 2 rows × 3 cols inside a panel */
+.stat-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  grid-template-rows:repeat(2,auto);
+  gap:clamp(5px,0.6vh,9px);
+  flex-shrink:0;
+}
+.stat-card{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:clamp(5px,0.7vh,10px) clamp(6px,0.7vw,12px);
+  background:rgba(10,22,52,0.7);border:1px solid rgba(0,130,220,0.10);border-radius:var(--radius);
+  position:relative;overflow:hidden;transition:border-color .35s,box-shadow .35s;
+}
+.stat-card:hover{border-color:rgba(0,160,255,0.35);box-shadow:0 2px 18px rgba(0,100,200,0.12)}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:0 0 1px 1px}
+.stat-card:nth-child(1)::before{background:linear-gradient(90deg,#0091ff,#00d0ff)}
+.stat-card:nth-child(2)::before{background:linear-gradient(90deg,#00c853,#69f0ae)}
+.stat-card:nth-child(3)::before{background:linear-gradient(90deg,#ff5252,#ff8a80)}
+.stat-card:nth-child(4)::before{background:linear-gradient(90deg,#ff9100,#ffd740)}
+.stat-card:nth-child(5)::before{background:linear-gradient(90deg,#7c4dff,#b388ff)}
+.stat-card:nth-child(6)::before{background:linear-gradient(90deg,#00b8ff,#0066ff)}
+.sc-val{
+  font-size:var(--fs-stat-num);font-weight:800;color:#e8f4ff;line-height:1.1;
+  font-family:Consolas,Monaco,"Courier New",monospace;transition:color .25s;
+}
+.sc-label{font-size:var(--fs-stat-label);color:var(--text-secondary);margin-top:1px;text-align:center}
+.sc-sub{font-size:clamp(11px,1.3vh,14px);margin-top:1px;font-weight:600;text-align:center}
+.sc-sub.good{color:#69f0ae}.sc-sub.bad{color:#ff8a80}.sc-sub.neutral{color:#ffd740}
+
+/* Device list */
+#deviceList{flex:1;overflow-y:auto;overflow-x:hidden;padding-right:2px;min-height:0}
+.device-item{
+  display:flex;align-items:center;
+  padding:clamp(5px,0.7vh,9px) clamp(8px,0.9vw,12px);
+  margin-bottom:3px;background:rgba(10,24,48,0.5);border-radius:3px;
+  border-left:3px solid transparent;transition:all .28s;
+}
+.device-item:hover{background:rgba(16,36,68,0.6);transform:translateX(3px)}
+.device-item.online{border-left-color:var(--accent-green)}
+.device-item.offline{border-left-color:var(--accent-red)}
+.device-item.alarm{border-left-color:var(--accent-orange)}
+.device-dot{width:8px;height:8px;border-radius:50%;margin-right:8px;flex-shrink:0}
+.device-dot.online{background:var(--accent-green);box-shadow:0 0 6px var(--accent-green)}
+.device-dot.offline{background:var(--accent-red);box-shadow:0 0 6px var(--accent-red)}
+.device-dot.alarm{background:var(--accent-orange);box-shadow:0 0 6px var(--accent-orange);animation:blink .9s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.device-info{flex:1;min-width:0}
+.device-name{font-size:var(--fs-device);color:#c0d8f4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.device-station{font-size:12px;color:var(--text-secondary);margin-top:1px}
+.device-val{text-align:right;flex-shrink:0}
+.device-val .v{font-size:clamp(14px,1.7vh,20px);font-weight:700;color:var(--accent-cyan);font-family:Consolas,Monaco,monospace}
+.device-val .u{font-size:11px;color:var(--text-secondary);margin-left:2px}
+
+/* ============================================================
+   CENTER COLUMN
+   ============================================================ */
+.center-col{
+  display:grid;grid-template-rows:5fr auto 4fr;gap:var(--gap);min-height:0;
+}
+/* Map */
+#map-canvas{flex:1;min-height:0;width:100%;display:block}
+/* Hydro chart */
+#hydroCanvas{flex:1;min-height:0;width:100%;display:block}
+/* Toolbar */
+.chart-toolbar{
+  display:flex;justify-content:center;align-items:center;
+  gap:clamp(6px,0.8vw,12px);padding:clamp(4px,0.5vh,6px) 0;flex-shrink:0;
+}
+.chart-btn{
+  font-size:clamp(14px,1.6vh,20px);
+  padding:clamp(4px,0.5vh,6px) clamp(16px,2vw,28px);
+  border:1px solid rgba(0,150,255,0.22);border-radius:14px;
+  cursor:pointer;color:var(--text-secondary);background:rgba(6,20,44,0.5);
+  transition:all .3s;font-family:inherit;
+}
+.chart-btn:hover{border-color:rgba(0,180,255,0.45);color:#b8d8f8}
+.chart-btn.active{
+  background:rgba(0,160,255,0.16);color:var(--accent-cyan);
+  border-color:rgba(0,180,255,0.5);box-shadow:0 0 12px rgba(0,160,255,0.15);
+}
+.chart-btn:focus{outline:none}
+
+/* ============================================================
+   RIGHT COLUMN
+   ============================================================ */
+.right-col{
+  display:grid;grid-template-rows:1fr auto;gap:var(--gap);min-height:0;
+}
+/* Alert list */
+#alertList{flex:1;overflow-y:auto;min-height:0;padding-right:2px}
+.alert-item{
+  display:flex;align-items:flex-start;
+  padding:clamp(6px,0.8vh,10px) clamp(8px,0.9vw,12px);
+  margin-bottom:clamp(3px,0.4vh,6px);
+  background:rgba(10,24,48,0.5);border-radius:3px;border-left:3px solid;
+  animation:slide-in .3s ease;
+}
+@keyframes slide-in{from{transform:translateX(40px);opacity:0}to{transform:translateX(0);opacity:1}}
+.alert-item.red{border-left-color:var(--accent-red);background:rgba(255,50,50,0.05)}
+.alert-item.orange{border-left-color:var(--accent-orange);background:rgba(255,145,0,0.04)}
+.alert-item.yellow{border-left-color:#ffd600;background:rgba(255,214,0,0.03)}
+.alert-tag{font-size:12px;font-weight:700;padding:2px 7px;border-radius:3px;margin-right:8px;flex-shrink:0;line-height:1.3}
+.alert-tag.red{background:var(--accent-red);color:#fff}
+.alert-tag.orange{background:var(--accent-orange);color:#fff}
+.alert-tag.yellow{background:#ffd600;color:#333}
+.alert-content{flex:1;min-width:0}
+.alert-text{font-size:var(--fs-alert);color:#d8d8d8;line-height:1.35}
+.alert-time{font-size:11px;color:var(--text-secondary);margin-top:2px}
+
+/* Gauge row */
+.gauge-row{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(5px,0.6vh,9px);flex:1;min-height:0}
+.gauge-item{position:relative;min-height:0;overflow:hidden}
+.gauge-item canvas{position:absolute;top:0;left:0;width:100%;height:100%;display:block}
+.gauge-label{position:absolute;bottom:2px;left:0;right:0;font-size:clamp(11px,1.3vh,16px);color:var(--text-secondary);text-align:center;pointer-events:none}
+
+/* ============================================================
+   CANVAS (shared)
+   ============================================================ */
+#map-panel-canvas,#hydro-panel-canvas{display:flex;flex-direction:column;min-height:0}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ TITLE BAR ══════════════ -->
+<div class="title-bar">
+  <h1>都江堰市青城山镇，流域水文监控预警平台</h1>
+  <h2>Hydrological Monitoring &amp; Early Warning Platform</h2>
+  <div class="title-right">
+    <div class="dot"></div><span>系统运行中</span>
+    <span>刷新 <b style="color:#b0d0e8" id="hRefresh">0</b></span>
+    <span id="hTime" style="color:#c0d8f0">--:--:--</span>
+  </div>
+</div>
+
+<!-- ══════════════ LEFT COLUMN ══════════════ -->
+<div class="left-col">
+  <!-- Stat cards (2 rows × 3 cols) -->
+  <div class="panel" style="flex-shrink:0">
+    <div class="panel-title">运行概览</div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="sc-val" id="sTotal">60</div><div class="sc-label">设备总数</div></div>
+      <div class="stat-card"><div class="sc-val" id="sOnline">58</div><div class="sc-label">在线</div><div class="sc-sub good" id="sOnlineRate">96.7%</div></div>
+      <div class="stat-card"><div class="sc-val" id="sAlert">3</div><div class="sc-label">报警</div><div class="sc-sub bad" id="sAlertTrend">—</div></div>
+      <div class="stat-card"><div class="sc-val" id="sStation">12</div><div class="sc-label">监测站</div></div>
+      <div class="stat-card"><div class="sc-val" id="sRain">12.5</div><div class="sc-label">降雨量 (mm)</div></div>
+      <div class="stat-card"><div class="sc-val" id="sFlow">--</div><div class="sc-label">总流量 (m³/s)</div></div>
+    </div>
+  </div>
+  <!-- Device list -->
+  <div class="panel" id="dev-panel">
+    <div class="panel-title">设备实时状态 <span class="badge" id="devBadge">60台</span></div>
+    <div id="deviceList" class="scrollbar"></div>
+  </div>
+</div>
+
+<!-- ══════════════ CENTER COLUMN ══════════════ -->
+<div class="center-col">
+  <!-- Map -->
+  <div class="panel" id="map-panel-canvas">
+    <div class="panel-title">青城山 · 水系与监测站点分布</div>
+    <canvas id="map-canvas"></canvas>
+  </div>
+  <!-- Toolbar -->
+  <div class="chart-toolbar">
+    <button class="chart-btn active" id="btn24" onclick="switchPeriod(24)">24小时</button>
+    <button class="chart-btn" id="btn168" onclick="switchPeriod(168)">7天</button>
+  </div>
+  <!-- Hydro chart -->
+  <div class="panel" id="hydro-panel-canvas">
+    <div class="panel-title">实时水文过程线（双Y轴：水位 m + 流量 m³/s）</div>
+    <canvas id="hydroCanvas"></canvas>
+  </div>
+</div>
+
+<!-- ══════════════ RIGHT COLUMN ══════════════ -->
+<div class="right-col">
+  <!-- Alert list -->
+  <div class="panel">
+    <div class="panel-title">实时报警列表 <span class="badge" id="alertBadge">0</span></div>
+    <div id="alertList" class="scrollbar"></div>
+  </div>
+  <!-- Gauges -->
+  <div class="panel" style="height:clamp(160px,22vh,250px);flex-shrink:0">
+    <div class="panel-title">关键指标 · 仪表盘</div>
+    <div class="gauge-row">
+      <div class="gauge-item"><canvas id="gWater" data-title="水位"></canvas><div class="gauge-label">m</div></div>
+      <div class="gauge-item"><canvas id="gFlow" data-title="流量"></canvas><div class="gauge-label">m³/s</div></div>
+      <div class="gauge-item"><canvas id="gRain" data-title="雨强"></canvas><div class="gauge-label">mm/h</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// HELPERS
+// ============================================================
+function clamp(min,pref,max){return Math.max(min,Math.min(pref,max))}
+var vh=window.innerHeight/100;
+window.addEventListener('resize',function(){vh=window.innerHeight/100});
+
+// ============================================================
+// DATA
+// ============================================================
+var stations=[
+  {id:'S01',name:'青城山前山',lat:30.900,lng:103.565,type:'key',dev:5},
+  {id:'S02',name:'青城山后山',lat:30.922,lng:103.535,type:'key',dev:5},
+  {id:'S03',name:'泰安古镇',lat:30.918,lng:103.540,type:'urban',dev:5},
+  {id:'S04',name:'味江上游',lat:30.938,lng:103.522,type:'upstream',dev:5},
+  {id:'S05',name:'沙沟河渡口',lat:30.878,lng:103.578,type:'upstream',dev:5},
+  {id:'S06',name:'泊江河桥',lat:30.905,lng:103.600,type:'upstream',dev:5},
+  {id:'S07',name:'青城山大道',lat:30.893,lng:103.555,type:'urban',dev:5},
+  {id:'S08',name:'太平场',lat:30.870,lng:103.538,type:'downstream',dev:5},
+  {id:'S09',name:'中兴场',lat:30.880,lng:103.590,type:'downstream',dev:5},
+  {id:'S10',name:'大观镇',lat:30.860,lng:103.508,type:'downstream',dev:5},
+  {id:'S11',name:'两河口',lat:30.942,lng:103.548,type:'upstream',dev:5},
+  {id:'S12',name:'药王山',lat:30.915,lng:103.558,type:'tributary',dev:5}
+];
+var dTypes=['ZY-LLJ300 雷达流量计','ZY-SWJ351 雷达水位计','ZY-YLJ300 翻斗雨量计','遥测终端机RTU','太阳能供电'];
+var alertPool=[
+  {msg:'水位超警戒阈值 (>6.5m)',level:'red'},
+  {msg:'流量超安全限值 (>850m³/s)',level:'red'},
+  {msg:'设备通信中断超时',level:'red'},
+  {msg:'降雨强度超预警值 (>50mm/h)',level:'orange'},
+  {msg:'水位接近警戒线 (>5.8m)',level:'orange'},
+  {msg:'流量变化率异常波动',level:'orange'},
+  {msg:'蓄电池电压偏低 (<11.5V)',level:'yellow'},
+  {msg:'数据采集延迟 (>3周期)',level:'yellow'},
+  {msg:'信号质量下降 (<60%)',level:'yellow'},
+  {msg:'传感器读数漂移',level:'yellow'}
+];
+var devices=[],alerts=[];
+var t24L=[],t24F=[],t24T=[],t7dL=[],t7dF=[],t7dT=[];
+var period=24,rn=0,prevOn=60,prevAl=0,af=0;
+
+for(var s=0;s<stations.length;s++)
+  for(var d=0;d<stations[s].dev;d++)
+    devices.push({
+      id:stations[s].id+'-D'+(d+1).toString().padStart(2,'0'),
+      name:dTypes[d],station:stations[s].name,sid:stations[s].id,
+      status:'online',level:18+Math.random()*5,flow:45+Math.random()*25,rain:0
+    });
+
+var n24=new Date();
+for(var i=239;i>=0;i--){
+  var t=new Date(n24-3600000*i/10);
+  t24T.push(t.getHours().toString().padStart(2,'0')+':'+t.getMinutes().toString().padStart(2,'0'));
+  t24L.push(16+Math.sin(i/35)*2.5+Math.random()*1.8);
+  t24F.push(380+Math.cos(i/28)*80+Math.random()*40);
+}
+var n7=new Date();
+for(var i=167;i>=0;i--){
+  var t=new Date(n7-3600000*i);
+  t7dT.push((t.getMonth()+1)+'/'+t.getDate()+' '+t.getHours().toString().padStart(2,'0')+':00');
+  t7dL.push(16+Math.sin(i/60)*2.5+Math.random()*1.8);
+  t7dF.push(380+Math.cos(i/50)*80+Math.random()*40);
+}
+
+function genAlert(){
+  var m=alertPool[Math.floor(Math.random()*alertPool.length)];
+  var s=stations[Math.floor(Math.random()*stations.length)];
+  return{id:'A'+Date.now()+Math.random().toString(36).slice(2,6),level:m.level,
+    msg:m.msg,station:s.name,dev:dTypes[Math.floor(Math.random()*3)],
+    time:new Date().toLocaleTimeString('zh-CN',{hour12:false}),ts:Date.now()};
+}
+for(var i=0;i<3;i++)alerts.push(genAlert());
+
+// ============================================================
+// DRAW: MAP
+// ============================================================
+function drawMap(){
+  var c=document.getElementById('map-canvas');
+  if(!c)return;
+  var p=c.parentElement;if(!p)return;
+  var rect=p.getBoundingClientRect();
+  if(rect.width<5||rect.height<5)return;
+  c.width=rect.width*2;c.height=rect.height*2;
+  var ctx=c.getContext('2d');ctx.scale(2,2);
+  var W=rect.width,H=rect.height;
+  ctx.clearRect(0,0,W,H);
+  function cx(lng){return ((lng-103.50)/0.12)*W}
+  function cy(lat){return H-((lat-30.85)/0.11)*H}
+
+  // Terrain tint
+  var tg=ctx.createRadialGradient(W*.44,H*.48,10,W*.44,H*.48,Math.max(W,H)*.55);
+  tg.addColorStop(0,'rgba(12,55,28,.28)');tg.addColorStop(.45,'rgba(6,30,30,.10)');tg.addColorStop(1,'transparent');
+  ctx.fillStyle=tg;ctx.fillRect(0,0,W,H);
+
+  // Mountain mass
+  ctx.beginPath();
+  ctx.moveTo(cx(103.505),cy(30.92));
+  ctx.bezierCurveTo(cx(103.510),cy(30.940),cx(103.520),cy(30.950),cx(103.535),cy(30.948));
+  ctx.bezierCurveTo(cx(103.550),cy(30.946),cx(103.565),cy(30.935),cx(103.575),cy(30.920));
+  ctx.bezierCurveTo(cx(103.580),cy(30.905),cx(103.570),cy(30.890),cx(103.555),cy(30.882));
+  ctx.bezierCurveTo(cx(103.540),cy(30.875),cx(103.520),cy(30.872),cx(103.510),cy(30.878));
+  ctx.bezierCurveTo(cx(103.500),cy(30.885),cx(103.498),cy(30.900),cx(103.505),cy(30.92));
+  ctx.closePath();
+  ctx.fillStyle='rgba(20,60,25,.22)';ctx.fill();
+  ctx.strokeStyle='rgba(40,100,50,.12)';ctx.lineWidth=1.2;ctx.stroke();
+
+  // Front peak
+  ctx.beginPath();
+  ctx.moveTo(cx(103.555),cy(30.915));
+  ctx.bezierCurveTo(cx(103.558),cy(30.928),cx(103.565),cy(30.930),cx(103.570),cy(30.922));
+  ctx.bezierCurveTo(cx(103.572),cy(30.912),cx(103.565),cy(30.905),cx(103.558),cy(30.908));
+  ctx.bezierCurveTo(cx(103.552),cy(30.910),cx(103.552),cy(30.912),cx(103.555),cy(30.915));
+  ctx.closePath();
+  ctx.fillStyle='rgba(30,80,30,.18)';ctx.fill();
+  ctx.strokeStyle='rgba(50,120,60,.10)';ctx.lineWidth=1;ctx.stroke();
+
+  // Back peak
+  ctx.beginPath();ctx.arc(cx(103.535),cy(30.935),W*.025,0,Math.PI*2);
+  ctx.fillStyle='rgba(25,70,25,.16)';ctx.fill();
+  ctx.strokeStyle='rgba(45,110,55,.10)';ctx.lineWidth=1;ctx.stroke();
+
+  // Mountain label
+  ctx.fillStyle='rgba(100,160,120,.32)';ctx.font='bold '+Math.max(15,W*.018)+'px "Microsoft YaHei"';ctx.textAlign='center';
+  ctx.fillText('青城山',cx(103.558),cy(30.938));
+
+  // Wei River 味江
+  ctx.beginPath();
+  ctx.moveTo(cx(103.505),cy(30.950));
+  ctx.bezierCurveTo(cx(103.515),cy(30.942),cx(103.525),cy(30.935),cx(103.535),cy(30.925));
+  ctx.bezierCurveTo(cx(103.540),cy(30.915),cx(103.538),cy(30.905),cx(103.535),cy(30.895));
+  ctx.bezierCurveTo(cx(103.530),cy(30.882),cx(103.522),cy(30.870),cx(103.515),cy(30.860));
+  ctx.strokeStyle='rgba(20,110,190,.30)';ctx.lineWidth=Math.max(3,W*.005);ctx.lineCap='round';ctx.stroke();
+  ctx.strokeStyle='rgba(15,90,170,.08)';ctx.lineWidth=Math.max(9,W*.014);ctx.stroke();
+  ctx.fillStyle='rgba(70,150,200,.40)';ctx.font=Math.max(14,W*.015)+'px "Microsoft YaHei"';
+  ctx.fillText('味江',cx(103.526),cy(30.912));
+
+  // Shagou River 沙沟河
+  ctx.beginPath();
+  ctx.moveTo(cx(103.560),cy(30.892));
+  ctx.bezierCurveTo(cx(103.570),cy(30.888),cx(103.580),cy(30.882),cx(103.590),cy(30.875));
+  ctx.bezierCurveTo(cx(103.600),cy(30.868),cx(103.608),cy(30.860),cx(103.610),cy(30.855));
+  ctx.strokeStyle='rgba(18,105,182,.26)';ctx.lineWidth=Math.max(2.5,W*.004);ctx.lineCap='round';ctx.stroke();
+  ctx.strokeStyle='rgba(14,85,165,.07)';ctx.lineWidth=Math.max(7,W*.011);ctx.stroke();
+  ctx.fillStyle='rgba(65,145,195,.38)';ctx.font=Math.max(14,W*.015)+'px "Microsoft YaHei"';
+  ctx.fillText('沙沟河',cx(103.585),cy(30.882));
+
+  // Bojiang River 泊江河
+  ctx.beginPath();
+  ctx.moveTo(cx(103.588),cy(30.925));
+  ctx.bezierCurveTo(cx(103.595),cy(30.918),cx(103.600),cy(30.910),cx(103.605),cy(30.898));
+  ctx.bezierCurveTo(cx(103.610),cy(30.888),cx(103.612),cy(30.878),cx(103.612),cy(30.868));
+  ctx.strokeStyle='rgba(22,115,198,.26)';ctx.lineWidth=Math.max(2.5,W*.004);ctx.lineCap='round';ctx.stroke();
+  ctx.strokeStyle='rgba(16,90,175,.07)';ctx.lineWidth=Math.max(7,W*.011);ctx.stroke();
+  ctx.fillStyle='rgba(65,145,195,.38)';ctx.font=Math.max(14,W*.015)+'px "Microsoft YaHei"';
+  ctx.fillText('泊江河',cx(103.600),cy(30.895));
+
+  // Stations
+  var fs=Math.max(14,W*.015);
+  stations.forEach(function(st){
+    var sx=cx(st.lng),sy=cy(st.lat);
+    var dds=devices.filter(function(d){return d.sid===st.id});
+    var hasAl=dds.some(function(d){return d.status==='alarm'});
+    var hasOff=dds.some(function(d){return d.status==='offline'});
+    var ok=!hasAl&&!hasOff;
+
+    if(hasAl){
+      var pr=Math.max(5,W*.007)+Math.sin(af*0.13)*Math.max(3,W*.004);
+      ctx.beginPath();ctx.arc(sx,sy,pr,0,Math.PI*2);
+      ctx.strokeStyle='rgba(255,50,50,'+(.50+Math.sin(af*.13)*.30)+')';ctx.lineWidth=Math.max(1.8,W*.0022);ctx.stroke();
+      ctx.beginPath();ctx.arc(sx,sy,pr+Math.max(3,W*.004),0,Math.PI*2);
+      ctx.strokeStyle='rgba(255,50,50,'+(.18+Math.sin(af*.13)*.12)+')';ctx.lineWidth=.8;ctx.stroke();
+    }
+    if(ok&&!hasOff){
+      var br=Math.max(5,W*.007)+Math.sin(af*0.08+st.lng)*1.5;
+      ctx.beginPath();ctx.arc(sx,sy,br,0,Math.PI*2);
+      ctx.strokeStyle='rgba(0,230,118,'+(.22+Math.sin(af*0.08+st.lng)*.10)+')';ctx.lineWidth=.8;ctx.stroke();
+    }
+    var dr=st.type==='key'?Math.max(3.5,W*.0045):Math.max(2.8,W*.0035);
+    ctx.beginPath();ctx.arc(sx,sy,dr,0,Math.PI*2);
+    ctx.fillStyle=ok?'#00e676':(hasAl?'#ff3d50':'#ff9100');ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.25)';ctx.lineWidth=.6;ctx.stroke();
+
+    ctx.fillStyle=st.type==='key'?'rgba(255,210,50,.78)':'#b0d0f0';
+    ctx.font=(st.type==='key'?'bold ':'')+fs+'px "Microsoft YaHei"';ctx.textAlign='center';
+    ctx.fillText(st.name,sx,sy-Math.max(10,W*.012));
+  });
+
+  // Legend
+  var lx=Math.max(6,W*.006),ly=H-Math.max(50,W*.05);
+  ctx.fillStyle='rgba(0,0,0,.35)';ctx.fillRect(lx-2,ly-2,Math.max(120,W*.09),Math.max(50,W*.05));
+  [{c:'#00e676',t:'正常'},{c:'#ff3d50',t:'报警'},{c:'#ff9100',t:'离线'}].forEach(function(lg,i){
+    ctx.beginPath();ctx.arc(lx+6,ly+14+i*18,3,0,Math.PI*2);ctx.fillStyle=lg.c;ctx.fill();
+    ctx.fillStyle='#8ab0d0';ctx.font='14px "Microsoft YaHei"';ctx.textAlign='left';
+    ctx.fillText(lg.t,lx+16,ly+17+i*18);
+  });
+  // North arrow
+  ctx.fillStyle='rgba(130,170,205,.30)';ctx.font='14px "Microsoft YaHei"';ctx.textAlign='center';
+  ctx.fillText('N',W-18,16);
+  ctx.strokeStyle='rgba(130,170,205,.22)';ctx.lineWidth=.7;
+  ctx.beginPath();ctx.moveTo(W-18,25);ctx.lineTo(W-18,9);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(W-22,13);ctx.lineTo(W-18,5);ctx.lineTo(W-14,13);ctx.stroke();
+}
+
+// ============================================================
+// DRAW: HYDRO CHART
+// ============================================================
+function drawHydro(){
+  var c=document.getElementById('hydroCanvas');
+  if(!c)return;
+  var p=c.parentElement;if(!p)return;
+  var rect=p.getBoundingClientRect();
+  if(rect.width<5||rect.height<5)return;
+  c.width=rect.width*2;c.height=rect.height*2;
+  var ctx=c.getContext('2d');ctx.scale(2,2);
+  var W=rect.width,H=rect.height;
+  ctx.clearRect(0,0,W,H);
+
+  var L=period===24?t24L:t7dL,F=period===24?t24F:t7dF,T=period===24?t24T:t7dT;
+  var pad={t:H*.12,r:Math.max(48,W*.05),b:H*.16,l:Math.max(44,W*.048),r2:Math.max(44,W*.048)};
+  var pw=W-pad.l-pad.r-pad.r2,ph=H-pad.t-pad.b;
+  if(pw<5||ph<5)return;
+
+  // Grid
+  ctx.strokeStyle='rgba(0,130,210,.04)';ctx.lineWidth=.5;
+  for(var i=0;i<=5;i++){var gy=pad.t+ph*(i/5);ctx.beginPath();ctx.moveTo(pad.l,gy);ctx.lineTo(W-pad.r-pad.r2,gy);ctx.stroke()}
+
+  // Left Y (Level m)
+  var lmn=12,lmx=28,fsy=Math.max(12,W*.011);
+  for(var i=0;i<=5;i++){
+    var gy=pad.t+ph*(i/5);
+    ctx.fillStyle='#5db8fe';ctx.font=fsy+'px "Microsoft YaHei"';ctx.textAlign='right';
+    ctx.fillText((lmx-(lmx-lmn)*(i/5)).toFixed(1),pad.l-4,gy+3);
+  }
+  ctx.fillStyle='#5db8fe';ctx.font='bold '+fsy+'px "Microsoft YaHei"';ctx.textAlign='center';
+  ctx.fillText('水位(m)',pad.l+10,pad.t-5);
+
+  // Right Y (Flow m³/s)
+  var fmn=200,fmx=750;
+  for(var i=0;i<=5;i++){
+    var gy=pad.t+ph*(i/5);
+    ctx.fillStyle='#00e676';ctx.font=fsy+'px "Microsoft YaHei"';ctx.textAlign='left';
+    ctx.fillText((fmx-(fmx-fmn)*(i/5)).toFixed(0),W-pad.r-pad.r2+3,gy+3);
+  }
+  ctx.fillStyle='#00e676';ctx.font='bold '+fsy+'px "Microsoft YaHei"';ctx.textAlign='center';
+  ctx.fillText('流量(m³/s)',W-pad.r-pad.r2-10,pad.t-5);
+
+  // X labels
+  var xs=Math.max(1,Math.floor(L.length/8)),fsx=Math.max(11,W*.010);
+  ctx.fillStyle='rgba(130,165,200,.32)';ctx.font=fsx+'px "Microsoft YaHei"';ctx.textAlign='center';
+  for(var i=0;i<L.length;i+=xs){var gx=pad.l+pw*(i/(L.length-1));ctx.fillText(T[i],gx,H-pad.b+12)}
+
+  // Level fill
+  var grad=ctx.createLinearGradient(0,pad.t,0,pad.t+ph);
+  grad.addColorStop(0,'rgba(0,150,255,.10)');grad.addColorStop(.65,'rgba(0,100,200,.02)');grad.addColorStop(1,'transparent');
+  ctx.beginPath();
+  for(var i=0;i<L.length;i++){var gx=pad.l+pw*(i/(L.length-1)),gy=pad.t+ph*(1-(L[i]-lmn)/(lmx-lmn));i===0?ctx.moveTo(gx,gy):ctx.lineTo(gx,gy)}
+  ctx.lineTo(pad.l+pw,pad.t+ph);ctx.lineTo(pad.l,pad.t+ph);ctx.closePath();
+  ctx.fillStyle=grad;ctx.fill();
+
+  // Level line
+  ctx.beginPath();
+  for(var i=0;i<L.length;i++){var gx=pad.l+pw*(i/(L.length-1)),gy=pad.t+ph*(1-(L[i]-lmn)/(lmx-lmn));i===0?ctx.moveTo(gx,gy):ctx.lineTo(gx,gy)}
+  ctx.strokeStyle='rgba(0,180,255,.82)';ctx.lineWidth=Math.max(1.4,W*.0012);ctx.lineJoin='round';ctx.stroke();
+
+  // Flow line
+  ctx.beginPath();
+  for(var i=0;i<F.length;i++){var gx=pad.l+pw*(i/(F.length-1)),gy=pad.t+ph*(1-(F[i]-fmn)/(fmx-fmn));i===0?ctx.moveTo(gx,gy):ctx.lineTo(gx,gy)}
+  ctx.strokeStyle='rgba(0,230,118,.76)';ctx.lineWidth=Math.max(1.4,W*.0012);ctx.lineJoin='round';ctx.stroke();
+
+  // Legend
+  ctx.fillStyle='rgba(0,0,0,.25)';ctx.fillRect(W-135,3,128,32);
+  [{c:'rgba(0,180,255,.82)',t:'水位'},{c:'rgba(0,230,118,.76)',t:'流量'}].forEach(function(lg,i){
+    ctx.strokeStyle=lg.c;ctx.lineWidth=2;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(W-126,16+i*16);ctx.lineTo(W-110,16+i*16);ctx.stroke();
+    ctx.fillStyle='#c0d8f0';ctx.font='14px "Microsoft YaHei"';ctx.textAlign='left';
+    ctx.fillText(lg.t,W-102,19+i*16);
+  });
+}
+
+function switchPeriod(h){
+  period=h;
+  document.getElementById('btn24').classList.toggle('active',h===24);
+  document.getElementById('btn168').classList.toggle('active',h===168);
+  drawHydro();
+}
+
+// ============================================================
+// DRAW: GAUGE
+// ============================================================
+function drawGauge(canvas,val,max,color,unit){
+  var rect=canvas.getBoundingClientRect();
+  var W=rect.width,H=rect.height;
+  if(W<4||H<4)return;
+  canvas.width=Math.round(W*2);canvas.height=Math.round(H*2);
+  var ctx=canvas.getContext('2d');ctx.scale(2,2);
+  ctx.clearRect(0,0,W,H);
+  var cx=W/2,cy=H*.62,r=Math.min(cx,cy)-clamp(8,1.5*vh,18);
+  var sa=.75*Math.PI,ea=2.25*Math.PI;
+  // BG arc
+  ctx.beginPath();ctx.arc(cx,cy,r,sa,ea);
+  ctx.strokeStyle='rgba(10,50,90,.25)';ctx.lineWidth=clamp(8,1.5*vh,16);ctx.lineCap='round';ctx.stroke();
+  // Value arc with gradient
+  var ratio=Math.min(Math.max(val/max,0),1),arcEnd=sa+ratio*(ea-sa);
+  if(ratio>.005){
+    var grad=ctx.createLinearGradient(cx-r,cy,cx+r,cy);
+    grad.addColorStop(0,color);grad.addColorStop(1,color.replace('1',.35));
+    ctx.beginPath();ctx.arc(cx,cy,r,sa,arcEnd);
+    ctx.strokeStyle=grad;ctx.lineWidth=clamp(8,1.5*vh,16);ctx.lineCap='round';ctx.stroke();
+    // Glow
+    ctx.beginPath();ctx.arc(cx,cy,r,sa,arcEnd);
+    ctx.strokeStyle=color.replace('1',.18);ctx.lineWidth=clamp(10,2*vh,20);ctx.lineCap='round';ctx.stroke();
+  }
+  // Center value
+  var fsz=clamp(20,3.2*vh,34);
+  ctx.fillStyle='#e8f4ff';ctx.font='bold '+fsz+'px Consolas,Monaco,"Microsoft YaHei"';ctx.textAlign='center';
+  ctx.fillText(val.toFixed(1),cx,cy-clamp(3,0.5*vh,6));
+  // Unit
+  ctx.fillStyle='rgba(130,170,200,.45)';ctx.font=clamp(12,1.5*vh,17)+'px "Microsoft YaHei"';ctx.textAlign='center';
+  ctx.fillText(unit,cx,cy+clamp(16,2*vh,24));
+  // Title at top
+  ctx.fillStyle='rgba(110,150,190,.30)';ctx.font=clamp(11,1.3*vh,14)+'px "Microsoft YaHei"';ctx.textAlign='center';
+  ctx.fillText(canvas.getAttribute('data-title')||'',cx,clamp(14,1.6*vh,18));
+  // Tick marks + labels
+  var tickIn=r-clamp(7,1.3*vh,14),tickOut=r+3;
+  for(var i=0;i<=5;i++){
+    var a=sa+(ea-sa)*(i/5);
+    var x1=cx+tickIn*Math.cos(a),y1=cy+tickIn*Math.sin(a);
+    var x2=cx+tickOut*Math.cos(a),y2=cy+tickOut*Math.sin(a);
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);
+    ctx.strokeStyle='rgba(100,155,200,.20)';ctx.lineWidth=.8;ctx.stroke();
+    ctx.fillStyle='rgba(100,155,200,.26)';ctx.font=clamp(11,1.3*vh,14)+'px "Microsoft YaHei"';ctx.textAlign='center';
+    ctx.fillText((max*i/5).toFixed(0),cx+(tickOut+clamp(12,1.5*vh,18))*Math.cos(a),cy+(tickOut+clamp(9,1.1*vh,12))*Math.sin(a));
+  }
+}
+
+// ============================================================
+// ANIMATED NUMBERS
+// ============================================================
+var numT={};
+function animNum(id,t){numT[id]=t}
+function tickNums(){
+  ['sTotal','sOnline','sAlert','sStation','sRain','sFlow'].forEach(function(id){
+    var el=document.getElementById(id);if(!el)return;
+    var cur=parseInt(el.textContent)||0,tar=numT[id]||cur;
+    if(cur!==tar){var diff=tar-cur,st=Math.max(1,Math.abs(Math.round(diff/6)));el.textContent=cur+(diff>0?st:-st)}
+  });
+}
+
+// ============================================================
+// MAIN UPDATE
+// ============================================================
+function update(){
+  rn++;af++;
+  var on=0,off=0,alD=0;
+  for(var i=0;i<devices.length;i++){
+    var d=devices[i];
+    if(Math.random()<.018){var r=Math.random();d.status=r<.72?'online':(r<.9?'alarm':'offline')}
+    if(d.status==='online'){
+      on++;d.level=16+Math.sin(rn/10+i*.3)*2.5+Math.random()*1.5+2;
+      d.flow=380+Math.cos(rn/8+i*.2)*60+Math.random()*25;d.rain=Math.random()<.2?Math.random()*4:0;
+    }else if(d.status==='alarm'){
+      alD++;d.level=22+Math.random()*5+3;d.flow=500+Math.random()*200;d.rain=Math.random()*12;
+    }else{off++;d.level=0;d.flow=0;d.rain=0}
+  }
+  if(alD>alerts.length&&Math.random()<.35)alerts.unshift(genAlert());
+  if(alerts.length>15)alerts=alerts.slice(0,15);
+  var nts=Date.now();alerts=alerts.filter(function(a){return nts-a.ts<420000});
+
+  var tn=new Date();
+  t24T.shift();t24T.push(tn.getHours().toString().padStart(2,'0')+':'+tn.getMinutes().toString().padStart(2,'0'));
+  t7dT.shift();t7dT.push((tn.getMonth()+1)+'/'+tn.getDate()+' '+tn.getHours().toString().padStart(2,'0')+':'+tn.getMinutes().toString().padStart(2,'0'));
+  var nl=16+Math.sin(rn/12)*2.5+Math.random()*1.8;
+  var nf=380+Math.cos(rn/10)*80+Math.random()*35;
+  t24L.shift();t24L.push(nl);t7dL.shift();t7dL.push(nl);
+  t24F.shift();t24F.push(nf);t7dF.shift();t7dF.push(nf);
+
+  // Header stats
+  document.getElementById('hRefresh').textContent=rn;
+  document.getElementById('hTime').textContent=tn.toLocaleTimeString('zh-CN',{hour12:false});
+  var oRate=devices.length>0?(on/devices.length*100).toFixed(1):'0.0';
+  animNum('sTotal',devices.length);animNum('sOnline',on);animNum('sAlert',alerts.length);animNum('sStation',stations.length);
+  document.getElementById('sOnlineRate').textContent=oRate+'%';
+  document.getElementById('sOnlineRate').className='sc-sub '+(on>=prevOn?'good':'bad');
+  document.getElementById('sAlertTrend').textContent=alerts.length>prevAl?'↑'+(alerts.length-prevAl):(alerts.length<prevAl?'↓'+(prevAl-alerts.length):'—');
+  document.getElementById('sAlertTrend').className='sc-sub '+(alerts.length>0?'bad':'good');
+  var totalR=0;for(var i=0;i<devices.length;i++)totalR+=devices[i].rain;
+  document.getElementById('sRain').textContent=(totalR*0.1).toFixed(1);
+  var totalF=0;for(var i=0;i<devices.length;i++)totalF+=devices[i].flow;
+  document.getElementById('sFlow').textContent=totalF.toFixed(0);
+  document.getElementById('alertBadge').textContent=alerts.length;
+  document.getElementById('devBadge').textContent=devices.length+'台';
+  prevOn=on;prevAl=alerts.length;
+
+  // Device list
+  var dl=document.getElementById('deviceList'),html='';
+  var sorted=devices.slice().sort(function(a,b){var o={online:0,alarm:1,offline:2};return o[a.status]-o[b.status]});
+  for(var i=0;i<Math.min(sorted.length,14);i++){
+    var d=sorted[i],sc=d.status,v='--';
+    if(d.name.indexOf('水位')>-1)v=d.level.toFixed(2)+'<span class="u">m</span>';
+    else if(d.name.indexOf('流量')>-1)v=d.flow.toFixed(0)+'<span class="u">m³/s</span>';
+    else if(d.name.indexOf('雨量')>-1)v=d.rain.toFixed(1)+'<span class="u">mm</span>';
+    html+='<div class="device-item '+sc+'"><div class="device-dot '+sc+'"></div>'+
+      '<div class="device-info"><div class="device-name">'+d.name+'</div><div class="device-station">'+d.station+'</div></div>'+
+      '<div class="device-val"><span class="v">'+v+'</span></div></div>';
+  }
+  dl.innerHTML=html;
+
+  // Alert list
+  var al=document.getElementById('alertList'),ah='';
+  for(var i=0;i<alerts.length;i++){
+    var a=alerts[i];
+    ah+='<div class="alert-item '+a.level+'"><div class="alert-tag '+a.level+'">'+
+      (a.level==='red'?'紧急':a.level==='orange'?'警告':'提示')+'</div>'+
+      '<div class="alert-content"><div class="alert-text">['+a.station+'] '+a.msg+'</div>'+
+      '<div class="alert-time">'+a.dev+' | '+a.time+'</div></div></div>';
+  }
+  if(alerts.length===0)ah='<div style="color:rgba(100,140,180,.35);text-align:center;padding:30px;font-size:16px">当前无报警信息</div>';
+  al.innerHTML=ah;
+
+  // Draw charts
+  drawMap();drawHydro();
+  var act=devices.filter(function(d){return d.status!=='offline'});
+  var nAct=act.length||1;
+  var aL=act.reduce(function(a,d){return a+d.level},0)/nAct;
+  var aF=act.reduce(function(a,d){return a+d.flow},0)/nAct;
+  var mR=Math.max.apply(null,devices.map(function(d){return d.rain}));
+  drawGauge(document.getElementById('gWater'),(aL*0.35)||0,10,'rgba(0,180,255,1)','m');
+  drawGauge(document.getElementById('gFlow'),(aF*0.16)||0,100,'rgba(0,230,118,1)','m³/s');
+  drawGauge(document.getElementById('gRain'),(mR*4)||0,50,'rgba(255,145,0,1)','mm/h');
+  tickNums();
+}
+
+// ============================================================
+// RESIZE
+// ============================================================
+var resizeTimer;
+function onResize(){
+  clearTimeout(resizeTimer);
+  resizeTimer=setTimeout(function(){
+    var on=devices.filter(function(d){return d.status==='online'}).length;
+    var off=devices.filter(function(d){return d.status==='offline'}).length;
+    var alD=devices.filter(function(d){return d.status==='alarm'}).length;
+    drawMap();drawHydro();
+    var act=devices.filter(function(d){return d.status!=='offline'});
+    var nAct=act.length||1;
+    var aL=act.reduce(function(a,d){return a+d.level},0)/nAct;
+    var aF=act.reduce(function(a,d){return a+d.flow},0)/nAct;
+    var mR=Math.max.apply(null,devices.map(function(d){return d.rain}));
+    drawGauge(document.getElementById('gWater'),(aL*0.35)||0,10,'rgba(0,180,255,1)','m');
+    drawGauge(document.getElementById('gFlow'),(aF*0.16)||0,100,'rgba(0,230,118,1)','m³/s');
+    drawGauge(document.getElementById('gRain'),(mR*4)||0,50,'rgba(255,145,0,1)','mm/h');
+  },180);
+}
+window.addEventListener('resize',onResize);
+
+// Kick off
+update();
+setInterval(update,5000);
+setInterval(tickNums,200);
+</script>
+</body>
+</html>
