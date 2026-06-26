@@ -194,9 +194,13 @@ body{
 }
 .center-col>.panel{min-height:0}
 /* Map */
-#map-canvas{flex:1;min-height:0;width:100%;display:block}
+#map-container{flex:1;width:100%}
+#map-container img{filter:invert(0.92) hue-rotate(175deg) brightness(0.5) saturate(0.25)}
+/* Marker pulse for alarm */
+@keyframes mkPulse{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.35);opacity:.55}}
+.mk-alarm-outer{animation:mkPulse 1.5s ease-in-out infinite}
 /* Hydro chart */
-#hydroCanvas{flex:1;min-height:0;width:100%;display:block}
+#hydroCanvas{flex:1;width:100%;min-height:0;min-width:0;display:block}
 /* Toolbar */
 .chart-toolbar{
   display:flex;justify-content:center;align-items:center;
@@ -255,6 +259,7 @@ body{
    ============================================================ */
 #map-panel-canvas,#hydro-panel-canvas{display:flex;flex-direction:column;min-height:0}
 </style>
+<script src="https://api.tianditu.gov.cn/api?v=4.0&tk=af41f040736d4b4e592949396948f38c"></script>
 </head>
 <body>
 
@@ -297,7 +302,7 @@ body{
   <!-- Map -->
   <div class="panel" id="map-panel-canvas">
     <div class="panel-title">青城山 · 水系与监测站点分布</div>
-    <canvas id="map-canvas"></canvas>
+    <div id="map-container"></div>
   </div>
   <!-- Toolbar -->
   <div class="chart-toolbar">
@@ -404,133 +409,96 @@ function genAlert(){
 for(var i=0;i<3;i++)alerts.push(genAlert());
 
 // ============================================================
-// DRAW: MAP
+// DRAW: MAP (Tianditu)
 // ============================================================
-function drawMap(){
-  var c=document.getElementById('map-canvas');
-  if(!c)return;
-  var rect=c.getBoundingClientRect();
-  if(rect.width<5||rect.height<5)return;
-  c.width=rect.width*2;c.height=rect.height*2;
-  var ctx=c.getContext('2d');ctx.scale(2,2);
-  var W=rect.width,H=rect.height;
-  ctx.clearRect(0,0,W,H);
-  function cx(lng){return ((lng-103.50)/0.12)*W}
-  function cy(lat){return H-((lat-30.85)/0.11)*H}
+var map, mapMarkers=[];
 
-  // Terrain tint
-  var tg=ctx.createRadialGradient(W*.44,H*.48,10,W*.44,H*.48,Math.max(W,H)*.55);
-  tg.addColorStop(0,'rgba(12,55,28,.28)');tg.addColorStop(.45,'rgba(6,30,30,.10)');tg.addColorStop(1,'transparent');
-  ctx.fillStyle=tg;ctx.fillRect(0,0,W,H);
+function safAdd(m,o){if(m.addOverLay)m.addOverLay(o);else if(m.addOverlay)m.addOverlay(o);}
+function safRem(m,o){if(m.removeOverLay)m.removeOverLay(o);else if(m.removeOverlay)m.removeOverlay(o);}
 
-  // Mountain mass
-  ctx.beginPath();
-  ctx.moveTo(cx(103.505),cy(30.92));
-  ctx.bezierCurveTo(cx(103.510),cy(30.940),cx(103.520),cy(30.950),cx(103.535),cy(30.948));
-  ctx.bezierCurveTo(cx(103.550),cy(30.946),cx(103.565),cy(30.935),cx(103.575),cy(30.920));
-  ctx.bezierCurveTo(cx(103.580),cy(30.905),cx(103.570),cy(30.890),cx(103.555),cy(30.882));
-  ctx.bezierCurveTo(cx(103.540),cy(30.875),cx(103.520),cy(30.872),cx(103.510),cy(30.878));
-  ctx.bezierCurveTo(cx(103.500),cy(30.885),cx(103.498),cy(30.900),cx(103.505),cy(30.92));
-  ctx.closePath();
-  ctx.fillStyle='rgba(20,60,25,.22)';ctx.fill();
-  ctx.strokeStyle='rgba(40,100,50,.12)';ctx.lineWidth=1.2;ctx.stroke();
-
-  // Front peak
-  ctx.beginPath();
-  ctx.moveTo(cx(103.555),cy(30.915));
-  ctx.bezierCurveTo(cx(103.558),cy(30.928),cx(103.565),cy(30.930),cx(103.570),cy(30.922));
-  ctx.bezierCurveTo(cx(103.572),cy(30.912),cx(103.565),cy(30.905),cx(103.558),cy(30.908));
-  ctx.bezierCurveTo(cx(103.552),cy(30.910),cx(103.552),cy(30.912),cx(103.555),cy(30.915));
-  ctx.closePath();
-  ctx.fillStyle='rgba(30,80,30,.18)';ctx.fill();
-  ctx.strokeStyle='rgba(50,120,60,.10)';ctx.lineWidth=1;ctx.stroke();
-
-  // Back peak
-  ctx.beginPath();ctx.arc(cx(103.535),cy(30.935),W*.025,0,Math.PI*2);
-  ctx.fillStyle='rgba(25,70,25,.16)';ctx.fill();
-  ctx.strokeStyle='rgba(45,110,55,.10)';ctx.lineWidth=1;ctx.stroke();
-
-  // Mountain label
-  ctx.fillStyle='rgba(100,160,120,.32)';ctx.font='bold '+Math.max(15,W*.018)+'px "Microsoft YaHei"';ctx.textAlign='center';
-  ctx.fillText('青城山',cx(103.558),cy(30.938));
-
-  // Wei River 味江
-  ctx.beginPath();
-  ctx.moveTo(cx(103.505),cy(30.950));
-  ctx.bezierCurveTo(cx(103.515),cy(30.942),cx(103.525),cy(30.935),cx(103.535),cy(30.925));
-  ctx.bezierCurveTo(cx(103.540),cy(30.915),cx(103.538),cy(30.905),cx(103.535),cy(30.895));
-  ctx.bezierCurveTo(cx(103.530),cy(30.882),cx(103.522),cy(30.870),cx(103.515),cy(30.860));
-  ctx.strokeStyle='rgba(20,110,190,.30)';ctx.lineWidth=Math.max(3,W*.005);ctx.lineCap='round';ctx.stroke();
-  ctx.strokeStyle='rgba(15,90,170,.08)';ctx.lineWidth=Math.max(9,W*.014);ctx.stroke();
-  ctx.fillStyle='rgba(70,150,200,.40)';ctx.font=Math.max(14,W*.015)+'px "Microsoft YaHei"';
-  ctx.fillText('味江',cx(103.526),cy(30.912));
-
-  // Shagou River 沙沟河
-  ctx.beginPath();
-  ctx.moveTo(cx(103.560),cy(30.892));
-  ctx.bezierCurveTo(cx(103.570),cy(30.888),cx(103.580),cy(30.882),cx(103.590),cy(30.875));
-  ctx.bezierCurveTo(cx(103.600),cy(30.868),cx(103.608),cy(30.860),cx(103.610),cy(30.855));
-  ctx.strokeStyle='rgba(18,105,182,.26)';ctx.lineWidth=Math.max(2.5,W*.004);ctx.lineCap='round';ctx.stroke();
-  ctx.strokeStyle='rgba(14,85,165,.07)';ctx.lineWidth=Math.max(7,W*.011);ctx.stroke();
-  ctx.fillStyle='rgba(65,145,195,.38)';ctx.font=Math.max(14,W*.015)+'px "Microsoft YaHei"';
-  ctx.fillText('沙沟河',cx(103.585),cy(30.882));
-
-  // Bojiang River 泊江河
-  ctx.beginPath();
-  ctx.moveTo(cx(103.588),cy(30.925));
-  ctx.bezierCurveTo(cx(103.595),cy(30.918),cx(103.600),cy(30.910),cx(103.605),cy(30.898));
-  ctx.bezierCurveTo(cx(103.610),cy(30.888),cx(103.612),cy(30.878),cx(103.612),cy(30.868));
-  ctx.strokeStyle='rgba(22,115,198,.26)';ctx.lineWidth=Math.max(2.5,W*.004);ctx.lineCap='round';ctx.stroke();
-  ctx.strokeStyle='rgba(16,90,175,.07)';ctx.lineWidth=Math.max(7,W*.011);ctx.stroke();
-  ctx.fillStyle='rgba(65,145,195,.38)';ctx.font=Math.max(14,W*.015)+'px "Microsoft YaHei"';
-  ctx.fillText('泊江河',cx(103.600),cy(30.895));
-
-  // Stations
-  var fs=Math.max(14,W*.015);
-  stations.forEach(function(st){
-    var sx=cx(st.lng),sy=cy(st.lat);
-    var dds=devices.filter(function(d){return d.sid===st.id});
-    var hasAl=dds.some(function(d){return d.status==='alarm'});
-    var hasOff=dds.some(function(d){return d.status==='offline'});
-    var ok=!hasAl&&!hasOff;
-
-    if(hasAl){
-      var pr=Math.max(5,W*.007)+Math.sin(af*0.13)*Math.max(3,W*.004);
-      ctx.beginPath();ctx.arc(sx,sy,pr,0,Math.PI*2);
-      ctx.strokeStyle='rgba(255,50,50,'+(.50+Math.sin(af*.13)*.30)+')';ctx.lineWidth=Math.max(1.8,W*.0022);ctx.stroke();
-      ctx.beginPath();ctx.arc(sx,sy,pr+Math.max(3,W*.004),0,Math.PI*2);
-      ctx.strokeStyle='rgba(255,50,50,'+(.18+Math.sin(af*.13)*.12)+')';ctx.lineWidth=.8;ctx.stroke();
-    }
-    if(ok&&!hasOff){
-      var br=Math.max(5,W*.007)+Math.sin(af*0.08+st.lng)*1.5;
-      ctx.beginPath();ctx.arc(sx,sy,br,0,Math.PI*2);
-      ctx.strokeStyle='rgba(0,230,118,'+(.22+Math.sin(af*0.08+st.lng)*.10)+')';ctx.lineWidth=.8;ctx.stroke();
-    }
-    var dr=st.type==='key'?Math.max(3.5,W*.0045):Math.max(2.8,W*.0035);
-    ctx.beginPath();ctx.arc(sx,sy,dr,0,Math.PI*2);
-    ctx.fillStyle=ok?'#00e676':(hasAl?'#ff3d50':'#ff9100');ctx.fill();
-    ctx.strokeStyle='rgba(255,255,255,.25)';ctx.lineWidth=.6;ctx.stroke();
-
-    ctx.fillStyle=st.type==='key'?'rgba(255,210,50,.78)':'#b0d0f0';
-    ctx.font=(st.type==='key'?'bold ':'')+fs+'px "Microsoft YaHei"';ctx.textAlign='center';
-    ctx.fillText(st.name,sx,sy-Math.max(18,W*.024));
-  });
-
-  // Legend
-  var lx=Math.max(6,W*.006),ly=H-Math.max(50,W*.05);
-  ctx.fillStyle='rgba(0,0,0,.35)';ctx.fillRect(lx-2,ly-2,Math.max(120,W*.09),Math.max(56,W*.056));
-  [{c:'#00e676',t:'正常'},{c:'#ff3d50',t:'报警'},{c:'#ff9100',t:'离线'}].forEach(function(lg,i){
-    ctx.beginPath();ctx.arc(lx+6,ly+14+i*18,3,0,Math.PI*2);ctx.fillStyle=lg.c;ctx.fill();
-    ctx.fillStyle='#8ab0d0';ctx.font='14px "Microsoft YaHei"';ctx.textAlign='left';
-    ctx.fillText(lg.t,lx+16,ly+17+i*18);
-  });
-  // North arrow
-  ctx.fillStyle='rgba(130,170,205,.30)';ctx.font='14px "Microsoft YaHei"';ctx.textAlign='center';
-  ctx.fillText('N',W-18,16);
-  ctx.strokeStyle='rgba(130,170,205,.22)';ctx.lineWidth=.7;
-  ctx.beginPath();ctx.moveTo(W-18,25);ctx.lineTo(W-18,9);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(W-22,13);ctx.lineTo(W-18,5);ctx.lineTo(W-14,13);ctx.stroke();
+function getStationColor(st){
+  var dds=devices.filter(function(d){return d.sid===st.id});
+  var hasAl=dds.some(function(d){return d.status==='alarm'});
+  var hasOff=dds.some(function(d){return d.status==='offline'});
+  if(hasAl)return 'alarm';
+  if(hasOff&&!hasAl)return 'offline';
+  return 'online';
 }
+
+var markerColors={online:'#00e676',alarm:'#ff3d50',offline:'#ff9100'};
+var markerStroke={online:'rgba(0,230,118,0.5)',alarm:'rgba(255,61,80,0.5)',offline:'rgba(255,145,0,0.5)'};
+var markerGlow={online:'0 0 10px rgba(0,230,118,0.55),0 0 20px rgba(0,230,118,0.2)',alarm:'0 0 10px rgba(255,61,80,0.55),0 0 20px rgba(255,61,80,0.2)',offline:'0 0 10px rgba(255,145,0,0.55),0 0 20px rgba(255,145,0,0.2)'};
+var labelOffsets={S01:[0,-30],S02:[-40,-15],S03:[35,-15],S12:[0,20],S07:[30,0],S04:[-35,-5]};
+
+function addStationMarkers(){
+  if(!map)return;
+  mapMarkers.forEach(function(item){item.marker&&safRem(map,item.marker);item.label&&safRem(map,item.label);});
+  mapMarkers=[];
+  stations.forEach(function(st){
+    var stat=getStationColor(st),fill=markerColors[stat],strk=markerStroke[stat],glow=markerGlow[stat];
+    var mk;
+    var icnHtml='<div class="mk-marker-dot" style="width:26px;height:26px;position:relative;transform-origin:13px 20px;">'+
+      '<div style="position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;'+
+      'background:'+fill+';box-shadow:'+glow+';border:2px solid '+strk+';box-sizing:border-box;'+
+      (stat==='alarm'?'animation:mkPulse 1.5s ease-in-out infinite;':'')+'"></div>'+
+      '<div style="position:absolute;top:9px;left:9px;width:8px;height:8px;border-radius:50%;'+
+      'background:rgba(255,255,255,0.85);"></div></div>';
+    try{
+      var icn=new T.DivIcon({html:icnHtml,iconSize:new T.Point(26,26),iconAnchor:new T.Point(13,20),className:''});
+      mk=new T.Marker(new T.LngLat(st.lng,st.lat),{icon:icn});
+    }catch(e){mk=new T.Marker(new T.LngLat(st.lng,st.lat));}
+    var off=labelOffsets[st.id]||[0,-35];
+    var lbl=new T.Label({text:st.name,position:new T.LngLat(st.lng,st.lat),offset:new T.Point(off[0],off[1])});
+    try{lbl.setFontColor('#e0f0ff');}catch(e){}
+    try{lbl.setFontSize('15px');}catch(e){}
+    try{lbl.setFontWeight('bold');}catch(e){}
+    try{lbl.setBackgroundColor('rgba(0,10,30,0.78)');}catch(e){}
+    try{lbl.setBorderLine(1);}catch(e){}
+    try{lbl.setBorderColor('rgba(0,160,255,0.25)');}catch(e){}
+    try{lbl.setBoxShadow('0 2px 8px rgba(0,0,0,0.5)');}catch(e){}
+    safAdd(map,mk);safAdd(map,lbl);
+    mapMarkers.push({marker:mk,label:lbl,station:st,baseOffset:[off[0],off[1]]});
+  });
+}
+
+function rescaleMarkers(){
+  if(!map)return;
+  var zoom=map.getZoom(),scale=Math.pow(1.18,zoom-13);
+  scale=Math.max(0.55,Math.min(2.1,scale));
+  var dots=document.querySelectorAll('.mk-marker-dot');
+  dots.forEach(function(d){d.style.transform='scale('+scale+')';});
+  var fs=Math.round(13*scale);
+  mapMarkers.forEach(function(item){
+    if(item.label){
+      try{item.label.setFontSize(fs+'px');}catch(e){}
+      try{item.label.setOffset(new T.Point(
+        Math.round(item.baseOffset[0]*scale),Math.round(item.baseOffset[1]*scale)));}catch(e){}
+    }
+  });
+}
+
+function initMap(){
+  try{
+    var container=document.getElementById('map-container');
+    if(!container||typeof T==='undefined')return;
+    if(map)return;
+    map=new T.Map('map-container');
+    map.centerAndZoom(new T.LngLat(103.555,30.905),13);
+    map.disableDoubleClickZoom();
+    try{map.addEventListener('zoomend',rescaleMarkers);}catch(e){}
+    addStationMarkers();
+    setTimeout(rescaleMarkers,200);
+  }catch(e){console.error('initMap error:',e);}
+}
+
+function updateMapMarkers(){
+  if(!map||!mapMarkers.length)return;
+  mapMarkers.forEach(function(item){
+    var stat=getStationColor(item.station);
+    if(item.marker.setStyle) item.marker.setStyle({fillColor:markerColors[stat],color:markerStroke[stat]});
+  });
+}
+
 
 // ============================================================
 // DRAW: HYDRO CHART
@@ -538,11 +506,12 @@ function drawMap(){
 function drawHydro(){
   var c=document.getElementById('hydroCanvas');
   if(!c)return;
+  var dpr=window.devicePixelRatio||1;
   var rect=c.getBoundingClientRect();
-  if(rect.width<5||rect.height<5)return;
-  c.width=rect.width*2;c.height=rect.height*2;
-  var ctx=c.getContext('2d');ctx.scale(2,2);
   var W=rect.width,H=rect.height;
+  if(W<10||H<10)return;
+  c.width=Math.round(W*dpr);c.height=Math.round(H*dpr);
+  var ctx=c.getContext('2d');ctx.scale(dpr,dpr);
   ctx.clearRect(0,0,W,H);
 
   var L=period===24?t24L:t7dL,F=period===24?t24F:t7dF,T=period===24?t24T:t7dT;
@@ -744,8 +713,9 @@ function update(){
   if(alerts.length===0)ah='<div style="color:rgba(100,140,180,.35);text-align:center;padding:30px;font-size:16px">当前无报警信息</div>';
   al.innerHTML=ah;
 
-  // Draw charts
-  drawMap();drawHydro();
+  initMap();
+  try{updateMapMarkers();}catch(e){}
+  drawHydro();
   var act=devices.filter(function(d){return d.status!=='offline'});
   var nAct=act.length||1;
   var aL=act.reduce(function(a,d){return a+d.level},0)/nAct;
@@ -767,7 +737,7 @@ function onResize(){
     var on=devices.filter(function(d){return d.status==='online'}).length;
     var off=devices.filter(function(d){return d.status==='offline'}).length;
     var alD=devices.filter(function(d){return d.status==='alarm'}).length;
-    drawMap();drawHydro();
+    rescaleMarkers();updateMapMarkers();drawHydro();
     var act=devices.filter(function(d){return d.status!=='offline'});
     var nAct=act.length||1;
     var aL=act.reduce(function(a,d){return a+d.level},0)/nAct;
@@ -781,6 +751,9 @@ function onResize(){
 window.addEventListener('resize',onResize);
 
 // Kick off
+if(window.ResizeObserver){
+  new ResizeObserver(function(){drawHydro();}).observe(document.getElementById('hydroCanvas'));
+}
 update();
 setInterval(update,5000);
 setInterval(tickNums,200);
